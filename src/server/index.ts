@@ -85,8 +85,27 @@ const fs = require('fs')
 // API to list available sample files
 app.get('/api/samples', (req, res) => {
   try {
-    const samplesDir = path.join(__dirname, '../../samples')
-    const files = fs.readdirSync(samplesDir)
+    // Try multiple possible sample directories
+    const possibleDirs = [
+      path.join(__dirname, '../../samples'), // Development
+      path.join(require('os').tmpdir(), 'logui-demos'), // Global install demos
+      path.join(__dirname, '../samples'), // Alternative build structure
+    ]
+    
+    let samplesDir = ''
+    let files: string[] = []
+    
+    for (const dir of possibleDirs) {
+      if (fs.existsSync(dir)) {
+        samplesDir = dir
+        files = fs.readdirSync(dir)
+        break
+      }
+    }
+    
+    if (!samplesDir) {
+      return res.json([]) // Return empty array if no samples directory found
+    }
     const logFiles = files.filter((file: string) => file.endsWith('.log'))
     
     const fileInfo = logFiles.map((file: string) => {
@@ -115,8 +134,22 @@ app.get('/api/samples/:filename', (req, res) => {
       return res.status(400).json({ error: 'Invalid filename' })
     }
     
-    const filePath = path.join(__dirname, '../../samples', filename)
-    if (!fs.existsSync(filePath)) {
+    // Try multiple possible sample directories
+    const possibleDirs = [
+      path.join(__dirname, '../../samples'), // Development
+      path.join(require('os').tmpdir(), 'logui-demos'), // Global install demos
+      path.join(__dirname, '../samples'), // Alternative build structure
+    ]
+    
+    let filePath = ''
+    for (const dir of possibleDirs) {
+      const testPath = path.join(dir, filename)
+      if (fs.existsSync(testPath)) {
+        filePath = testPath
+        break
+      }
+    }
+    if (!filePath) {
       return res.status(404).json({ error: 'File not found' })
     }
     
