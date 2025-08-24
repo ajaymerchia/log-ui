@@ -1,10 +1,37 @@
-import React, { useRef } from 'react'
-import { Upload, File } from 'lucide-react'
+import React, { useRef, useState, useEffect } from 'react'
+import { Upload, File, ChevronDown } from 'lucide-react'
 import { useSocketContext } from '../contexts/SocketContext'
+
+interface SampleFile {
+  name: string
+  size: number
+  modified: string
+}
 
 const FileUpload: React.FC = () => {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const { socket } = useSocketContext()
+  const [showSampleFiles, setShowSampleFiles] = useState(false)
+  const [availableFiles, setAvailableFiles] = useState<SampleFile[]>([])
+  
+  useEffect(() => {
+    // Fetch available sample files from the API
+    const fetchSampleFiles = async () => {
+      try {
+        const response = await fetch('/api/samples')
+        if (response.ok) {
+          const files = await response.json()
+          setAvailableFiles(files)
+        } else {
+          console.error('[FILEUPLOAD] Failed to fetch sample files:', response.statusText)
+        }
+      } catch (error) {
+        console.error('[FILEUPLOAD] Error fetching sample files:', error)
+      }
+    }
+    
+    fetchSampleFiles()
+  }, [])
 
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault()
@@ -44,62 +71,29 @@ const FileUpload: React.FC = () => {
     }
   }
 
-  const handleSampleFile = () => {
-    console.log('[FILEUPLOAD] Sample file button clicked!')
-    console.log('[FILEUPLOAD] Socket available:', !!socket)
-    console.log('[FILEUPLOAD] Socket connected:', socket?.connected)
-    console.log('[FILEUPLOAD] Socket ID:', socket?.id)
-    
-    if (socket && socket.connected) {
-      const filePath = '/Users/ajaymerchia/wkspc/logui/sample.log'
-      console.log('[FILEUPLOAD] Requesting tail:start from server for:', filePath)
-      socket.emit('tail:start', filePath)
-      
-      // Add confirmation listener
-      socket.once('source:added', (source) => {
-        console.log('[FILEUPLOAD] Successfully started tailing sample file:', source)
-      })
-      
-      // Add error listener
-      socket.once('error', (error) => {
-        console.error('[FILEUPLOAD] Error starting sample file tail:', error)
-      })
-    } else {
-      console.error('[FILEUPLOAD] Socket not connected for sample file!', { 
-        available: !!socket, 
-        connected: socket?.connected,
-        id: socket?.id
-      })
-    }
-  }
-
-  const handleDemoFile = () => {
-    console.log('[FILEUPLOAD] Demo button clicked!')
-    console.log('[FILEUPLOAD] Socket available:', !!socket)
-    console.log('[FILEUPLOAD] Socket connected:', socket?.connected)
-    console.log('[FILEUPLOAD] Socket ID:', socket?.id)
-    
-    if (socket && socket.connected) {
-      const filePath = '/Users/ajaymerchia/wkspc/logui/demo.log'
-      console.log('[FILEUPLOAD] Emitting tail:start for:', filePath)
-      socket.emit('tail:start', filePath)
-      
-      // Add confirmation listener
-      socket.once('source:added', (source) => {
-        console.log('[FILEUPLOAD] Successfully started tailing:', source)
-      })
-      
-      // Add error listener
-      socket.once('error', (error) => {
-        console.error('[FILEUPLOAD] Error starting tail:', error)
-      })
-    } else {
+  const loadSampleFile = async (fileName: string) => {
+    if (!socket || !socket.connected) {
       console.error('[FILEUPLOAD] Socket not connected!', { 
         available: !!socket, 
         connected: socket?.connected,
         id: socket?.id
       })
+      return
     }
+
+    console.log('[FILEUPLOAD] Loading sample file:', fileName)
+    
+    // All sample files use tailing for real-time updates
+    const filePath = `/Users/ajaymerchia/wkspc/logui/samples/${fileName}`
+    socket.emit('tail:start', filePath)
+    
+    socket.once('source:added', (source) => {
+      console.log('[FILEUPLOAD] Successfully started tailing:', source)
+    })
+    
+    socket.once('error', (error) => {
+      console.error('[FILEUPLOAD] Error starting tail:', error)
+    })
   }
 
   return (
@@ -132,21 +126,38 @@ const FileUpload: React.FC = () => {
               Select File
             </button>
             
-            <button
-              onClick={handleDemoFile}
-              className="w-full px-4 py-2 bg-success/10 border border-success/20 text-success rounded-lg hover:bg-success/20 transition-colors flex items-center justify-center gap-2"
-            >
-              <File className="w-4 h-4" />
-              Start Live Demo
-            </button>
-            
-            <button
-              onClick={handleSampleFile}
-              className="w-full px-4 py-2 bg-black/5 dark:bg-white/5 border border-border text-text-primary rounded-lg hover:bg-black/10 dark:hover:bg-white/10 transition-colors flex items-center justify-center gap-2"
-            >
-              <File className="w-4 h-4" />
-              Use Sample Log
-            </button>
+            <div className="relative">
+              <button
+                onClick={() => setShowSampleFiles(!showSampleFiles)}
+                className="w-full px-4 py-2 bg-black/5 dark:bg-white/5 border border-border text-text-primary rounded-lg hover:bg-black/10 dark:hover:bg-white/10 transition-colors flex items-center justify-between"
+              >
+                <div className="flex items-center gap-2">
+                  <File className="w-4 h-4" />
+                  Load Sample Files
+                </div>
+                <ChevronDown className={`w-4 h-4 transition-transform ${showSampleFiles ? 'rotate-180' : ''}`} />
+              </button>
+              
+              {showSampleFiles && (
+                <div className="absolute top-full left-0 right-0 mt-1 bg-background border border-border rounded-lg shadow-lg z-50 max-h-80 overflow-y-auto">
+                  {availableFiles.map((file, index) => (
+                    <button
+                      key={index}
+                      onClick={() => {
+                        loadSampleFile(file.name)
+                        setShowSampleFiles(false)
+                      }}
+                      className="w-full px-4 py-3 text-left hover:bg-black/5 dark:hover:bg-white/5 transition-colors border-b border-border last:border-b-0 first:rounded-t-lg last:rounded-b-lg"
+                    >
+                      <div className="font-medium text-sm">{file.name}</div>
+                      <div className="text-xs text-text-secondary mt-1">
+                        {(file.size / 1024).toFixed(1)} KB • Modified {new Date(file.modified).toLocaleDateString()}
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </div>

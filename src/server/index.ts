@@ -77,6 +77,54 @@ if (AUTO_TAIL_FILE) {
 
 // Serve static files for published version
 app.use(express.static(path.join(__dirname, '../client')))
+
+// Serve sample log files from samples directory
+const fs = require('fs')
+
+// API to list available sample files
+app.get('/api/samples', (req, res) => {
+  try {
+    const samplesDir = path.join(__dirname, '../../samples')
+    const files = fs.readdirSync(samplesDir)
+    const logFiles = files.filter((file: string) => file.endsWith('.log'))
+    
+    const fileInfo = logFiles.map((file: string) => {
+      const filePath = path.join(samplesDir, file)
+      const stats = fs.statSync(filePath)
+      return {
+        name: file,
+        size: stats.size,
+        modified: stats.mtime
+      }
+    })
+    
+    res.json(fileInfo)
+  } catch (error) {
+    console.error('[API] Error listing sample files:', error)
+    res.status(500).json({ error: 'Failed to list sample files' })
+  }
+})
+
+// Serve individual sample files dynamically
+app.get('/api/samples/:filename', (req, res) => {
+  try {
+    const filename = req.params.filename
+    // Security: only allow .log files and prevent directory traversal
+    if (!filename.endsWith('.log') || filename.includes('..') || filename.includes('/')) {
+      return res.status(400).json({ error: 'Invalid filename' })
+    }
+    
+    const filePath = path.join(__dirname, '../../samples', filename)
+    if (!fs.existsSync(filePath)) {
+      return res.status(404).json({ error: 'File not found' })
+    }
+    
+    res.sendFile(path.resolve(filePath))
+  } catch (error) {
+    console.error(`[API] Error serving sample file ${req.params.filename}:`, error)
+    res.status(500).json({ error: 'Failed to serve sample file' })
+  }
+})
 app.get('/api*', (req, res, next) => {
   // Let API routes pass through
   next()
@@ -449,7 +497,7 @@ io.on('connection', (socket) => {
 
     // Process all lines and send as direct LogEntry array (same as file tailing)
     const processedEntries = fileData.lines.map(line => {
-      return logParser.parseLine(line, fileData.name)
+      return logParser.parseLine(line, fileId)
     }).filter(entry => entry !== null) as LogEntry[]
 
     console.log(`[SOCKET] Processed ${processedEntries.length} log entries from uploaded file`)

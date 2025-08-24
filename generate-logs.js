@@ -3,7 +3,7 @@
 const fs = require('fs')
 const path = require('path')
 
-const LOG_FILE = path.join(__dirname, 'demo.log')
+const LOG_FILE = path.join(__dirname, 'samples', 'livestream.log')
 const SERVICES = ['API', 'AUTH', 'DB', 'CACHE', 'PAYMENT', 'METRICS', 'SECURITY', 'SERVER']
 const LOG_LEVELS = ['INFO', 'WARN', 'ERROR', 'DEBUG']
 const IPS = ['192.168.1.100', '192.168.1.101', '10.0.0.15', '172.16.0.5']

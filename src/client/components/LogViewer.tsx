@@ -73,7 +73,7 @@ const LogViewer: React.FC = () => {
   }
 
   const Row = ({ index, style }: { index: number; style: React.CSSProperties }) => (
-    <div style={style}>
+    <div key={filteredLogs[index].id} style={style}>
       <LogEntry log={filteredLogs[index]} />
     </div>
   )

@@ -1,0 +1,1 @@
+Do not run the servers yourself when you want to check if your changes worked. Assume the server is running and either use browser MCP tools or ask the user to do it.
