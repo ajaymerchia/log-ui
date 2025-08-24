@@ -1,6 +1,7 @@
 .logui-port
 bin
 test-client.js
+private-samples
 
 
 # Dependencies

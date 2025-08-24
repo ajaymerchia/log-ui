@@ -1,0 +1,51 @@
+# Development files
+src/
+tsconfig*.json
+vite.config.ts
+tailwind.config.js
+postcss.config.js
+private-samples
+.env*
+*.log
+
+# Build artifacts (keep dist/)
+node_modules/
+
+# Development tools
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Testing
+coverage/
+.nyc_output/
+*.lcov
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Development scripts
+scripts/dev-with-browser.js
+
+# Large sample files (we'll keep only small examples)
+samples/test-bigfile.log
+samples/livestream.log
+
+# Git
+.git/
+.gitignore
+
+# Documentation files we don't need in npm
+FEATURE_SPEC.md
+CLAUDE.md
+mockup.png
+
+# Shell scripts (install.sh, publish.sh are for development)
+*.sh
+
+# Lock files (let users choose their package manager)
+package-lock.json
+yarn.lock

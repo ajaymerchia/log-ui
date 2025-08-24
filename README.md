@@ -20,56 +20,60 @@ Beautiful, real-time log tailing interface inspired by Linear and Stripe's desig
 ## 🚀 Quick Start
 
 ```bash
-# One-line install (coming soon)
-curl https://logui.dev/install.sh | sh
+# Install globally with npm
+npm install -g log-ui
 
-# Then use like this:
-tail -f /var/log/app.log | logui
-# [LogUI] Enter Web UI at http://localhost:8080
-
-# Or install with npm
-npm install -g logui
+# Tail any log file
 logui /path/to/your/logfile.log
+
+# Try the demo with generated logs
+logui --demo
+
+# Or try specific demo types
+logui --demo bigfile        # Large file performance test
+logui --demo stack-traces   # Error logs with stack traces  
+logui --demo livestream     # Real-time streaming logs
+logui --demo corrupted      # Edge cases and malformed logs
 ```
 
-## 🎬 Try the Demo
+## 🎬 Demo Options
 
-Experience LogUI with live-generated logs:
+LogUI includes several demo modes to showcase different log scenarios:
 
 ```bash
-# Clone the repository
-git clone https://github.com/yourusername/logui.git
-cd logui
-npm install
+# Basic demo with typical application logs
+logui --demo basic
 
-# Start the interactive demo
-npm run demo
+# Large file performance test (10MB+ of logs)
+logui --demo bigfile
+
+# Stack traces and multiline error logs  
+logui --demo stack-traces
+
+# Real-time streaming logs (generates continuously)
+logui --demo livestream
+
+# Corrupted/malformed logs and edge cases
+logui --demo corrupted
 ```
 
-This will:
-1. 🔥 Start generating realistic log entries
-2. 🌐 Launch LogUI at http://localhost:5173
-3. 🎯 Auto-open your browser
-4. 📊 Click "Start Live Demo" to begin tailing
-
-## 📝 Log Generation
-
-Generate realistic test logs for development:
+You can also generate sample logs without starting the server:
 
 ```bash
-# Start generating logs to demo.log
-npm run generate-logs
-
-# In another terminal, tail the logs
-logui demo.log
+# Generate logs for testing
+logui --generate bigfile
+logui --generate stack-traces
+logui --generate livestream
 ```
 
 ## 🛠️ Development
 
+For local development:
+
 ```bash
-# Clone and install dependencies
-git clone https://github.com/yourusername/logui.git
-cd logui
+# Clone the repository  
+git clone https://github.com/ajaymerchia/log-ui.git
+cd log-ui
 npm install
 
 # Start development server
@@ -126,10 +130,20 @@ LogUI uses a beautiful dark theme by default, inspired by Linear and Stripe:
 logui [file] [options]
 
 Options:
-  -p, --port <port>    Server port (default: 3001)
-  --no-open           Don't open browser automatically
-  -h, --help          Display help information
-  -V, --version       Display version number
+  -p, --port <port>              Server port (default: 3001)
+  --no-open                      Don't open browser automatically
+  --demo [type]                  Run demo mode (basic|bigfile|stack-traces|corrupted|livestream)
+  --generate <type>              Generate sample logs (basic|bigfile|stack-traces|corrupted|livestream)
+  --tail <file>                  Tail a specific log file
+  -h, --help                     Display help information
+  -V, --version                  Display version number
+
+Examples:
+  logui app.log                  # Tail app.log
+  logui --demo                   # Run basic demo
+  logui --demo livestream        # Live streaming demo
+  logui --generate bigfile       # Generate 10MB test file
+  logui --port 8080 app.log      # Use custom port
 ```
 
 ## 🔧 Technical Stack
