@@ -1,0 +1,104 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  
+  :root {
+    --border: #E1E4E8;
+    --surface: #FFFFFF;
+    --text-primary: #24292F;
+    --text-secondary: #656D76;
+  }
+  
+  .dark {
+    --border: #21262D;
+    --surface: #0D1117;
+    --text-primary: #F0F6FC;
+    --text-secondary: #8B949E;
+  }
+  
+  body {
+    background-color: var(--surface);
+    color: var(--text-primary);
+    font-feature-settings: "rlig" 1, "calt" 1;
+  }
+
+  /* Responsive text color utilities */
+  .text-text-primary {
+    color: #24292F;
+  }
+  
+  .dark .text-text-primary {
+    color: #F0F6FC;
+  }
+  
+  .text-text-secondary {
+    color: #656D76;
+  }
+  
+  .dark .text-text-secondary {
+    color: #8B949E;
+  }
+
+  /* Responsive border utilities */
+  .border-border {
+    border-color: #E1E4E8;
+  }
+  
+  .dark .border-border {
+    border-color: #21262D;
+  }
+
+  /* Override for elements using CSS variables */
+  .hover\:text-text-primary:hover {
+    color: var(--text-primary);
+  }
+}
+
+@layer components {
+  .log-entry {
+    @apply hover:bg-black/5 dark:hover:bg-white/5 transition-colors duration-150;
+  }
+  
+  .log-entry.error {
+    @apply border-l-4 border-error bg-error/5;
+  }
+  
+  .log-entry.warn {
+    @apply border-l-4 border-warning bg-warning/5;
+  }
+  
+  .log-entry.info {
+    @apply border-l-4 border-success bg-success/5;
+  }
+  
+  .log-entry.debug {
+    @apply border-l-4 border-muted bg-muted/5;
+  }
+
+  .sidebar-section {
+    @apply mb-6;
+  }
+  
+  .sidebar-title {
+    @apply text-sm font-medium text-text-secondary uppercase tracking-wide mb-3;
+  }
+  
+  .filter-pill {
+    @apply inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium;
+    @apply bg-primary/10 text-primary border border-primary/20;
+  }
+  
+  .quick-filter {
+    @apply w-full text-left px-3 py-2 text-sm rounded-lg transition-colors;
+    @apply hover:bg-black/5 dark:hover:bg-white/5 active:bg-black/10 dark:active:bg-white/10;
+  }
+  
+  .quick-filter.active {
+    @apply bg-primary/10 text-primary border border-primary/20;
+  }
+}
