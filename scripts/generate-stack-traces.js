@@ -3,7 +3,13 @@
 const fs = require('fs')
 const path = require('path')
 
-const outputFile = path.join(__dirname, '../samples/stack-traces-demo.log')
+// Create a temp directory for demo files when installed globally
+const isGlobalInstall = __dirname.includes('node_modules')
+const outputDir = isGlobalInstall ? 
+  path.join(require('os').tmpdir(), 'logui-demos') : 
+  path.join(__dirname, '../samples')
+
+const outputFile = path.join(outputDir, 'stack-traces-demo.log')
 
 const STACK_TRACES = [
   {
@@ -51,6 +57,11 @@ const STACK_TRACES = [
 
 console.log(`🚀 Generating stack trace demo logs...`)
 console.log(`📁 Output: ${outputFile}`)
+
+// Ensure the output directory exists
+if (!fs.existsSync(outputDir)) {
+  fs.mkdirSync(outputDir, { recursive: true })
+}
 
 const logEntries = []
 

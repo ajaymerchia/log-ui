@@ -2,7 +2,7 @@
 bin
 test-client.js
 private-samples
-
+.claude
 
 # Dependencies
 node_modules/

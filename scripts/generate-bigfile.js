@@ -8,10 +8,21 @@ const TARGET_SIZE_MB = 10
 const ENTRIES_PER_MB = 1000
 const TOTAL_ENTRIES = TARGET_SIZE_MB * ENTRIES_PER_MB
 
-const outputFile = path.join(__dirname, '../samples/bigfile-demo.log')
+// Create a temp directory for demo files when installed globally
+const isGlobalInstall = __dirname.includes('node_modules')
+const outputDir = isGlobalInstall ? 
+  path.join(require('os').tmpdir(), 'logui-demos') : 
+  path.join(__dirname, '../samples')
+
+const outputFile = path.join(outputDir, 'bigfile-demo.log')
 
 console.log(`🚀 Generating ${TARGET_SIZE_MB}MB log file...`)
 console.log(`📁 Output: ${outputFile}`)
+
+// Ensure the output directory exists
+if (!fs.existsSync(outputDir)) {
+  fs.mkdirSync(outputDir, { recursive: true })
+}
 
 // Clear the file
 fs.writeFileSync(outputFile, '')

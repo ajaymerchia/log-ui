@@ -4,13 +4,24 @@ const fs = require('fs')
 const path = require('path')
 const { generateLogEntry } = require('../generate-logs.js')
 
-const outputFile = path.join(__dirname, '../samples/livestream-demo.log')
+// Create a temp directory for demo files when installed globally
+const isGlobalInstall = __dirname.includes('node_modules')
+const outputDir = isGlobalInstall ? 
+  path.join(require('os').tmpdir(), 'logui-demos') : 
+  path.join(__dirname, '../samples')
+
+const outputFile = path.join(outputDir, 'livestream-demo.log')
 const INTERVAL_MS = 1000 // Generate a log every second
 
 console.log(`🚀 Starting livestream log generator...`)
 console.log(`📁 Output: ${outputFile}`)
 console.log(`⏱️  Generating logs every ${INTERVAL_MS}ms`)
 console.log(`🛑 Press Ctrl+C to stop\n`)
+
+// Ensure the output directory exists
+if (!fs.existsSync(outputDir)) {
+  fs.mkdirSync(outputDir, { recursive: true })
+}
 
 // Clear the file
 fs.writeFileSync(outputFile, '')

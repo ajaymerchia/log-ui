@@ -4,10 +4,21 @@ const fs = require('fs')
 const path = require('path')
 const { generateLogEntry } = require('../generate-logs.js')
 
-const outputFile = path.join(__dirname, '../samples/corrupted-demo.log')
+// Create a temp directory for demo files when installed globally
+const isGlobalInstall = __dirname.includes('node_modules')
+const outputDir = isGlobalInstall ? 
+  path.join(require('os').tmpdir(), 'logui-demos') : 
+  path.join(__dirname, '../samples')
+
+const outputFile = path.join(outputDir, 'corrupted-demo.log')
 
 console.log(`🚀 Generating corrupted log demo...`)
 console.log(`📁 Output: ${outputFile}`)
+
+// Ensure the output directory exists
+if (!fs.existsSync(outputDir)) {
+  fs.mkdirSync(outputDir, { recursive: true })
+}
 
 const corruptedLogs = [
   // Normal logs first
