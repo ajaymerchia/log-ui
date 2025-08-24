@@ -227,6 +227,8 @@ export class LogParser {
   isNewLogEntry(line: string): boolean {
     if (!line.trim()) return false
     
+    console.log(`[PARSER] Checking if line is new entry: "${line.substring(0, 80)}..."`)
+    
     // Check for timestamp patterns at the beginning of the line
     const timestampPatterns = [
       // Bracketed ISO 8601: [2025-08-24T06:38:36.757Z]
@@ -243,7 +245,10 @@ export class LogParser {
     
     // If line starts with timestamp, it's definitely a new entry
     for (const pattern of timestampPatterns) {
-      if (pattern.test(line)) return true
+      if (pattern.test(line)) {
+        console.log(`[PARSER] Line matches timestamp pattern: true`)
+        return true
+      }
     }
     
     // If line starts with log level in brackets, it's likely a new entry
@@ -252,15 +257,18 @@ export class LogParser {
     if (match) {
       const levelCandidate = match[1].toUpperCase()
       if (LogParser.LOG_LEVELS.includes(levelCandidate as LogLevel)) {
+        console.log(`[PARSER] Line matches level pattern: true (${levelCandidate})`)
         return true
       }
     }
     
     // If line starts with common patterns indicating a new entry
     if (/^(INFO|WARN|ERROR|DEBUG|TRACE)\b/i.test(line)) {
+      console.log(`[PARSER] Line matches log level pattern: true`)
       return true
     }
     
+    console.log(`[PARSER] Line is continuation: false`)
     return false
   }
 

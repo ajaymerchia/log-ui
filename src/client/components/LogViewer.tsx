@@ -8,11 +8,11 @@ import { VariableSizeList as List } from 'react-window'
 
 const LogViewer: React.FC = () => {
   const { filteredLogs, autoScroll, sources, expandedEntries } = useLogStore()
-  console.log('[LogViewer] Rendering with:', {
-    filteredLogsCount: filteredLogs.length,
-    autoScroll,
-    sourcesCount: sources.length,
-  });
+  // console.log('[LogViewer] Rendering with:', {
+  //   filteredLogsCount: filteredLogs.length,
+  //   autoScroll,
+  //   sourcesCount: sources.length,
+  // });
   const listRef = useRef<List>(null)
   const [listHeight, setListHeight] = useState(600)
   const containerRef = useRef<HTMLDivElement>(null)

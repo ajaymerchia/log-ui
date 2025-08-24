@@ -45,9 +45,31 @@ const FileUpload: React.FC = () => {
   }
 
   const handleSampleFile = () => {
-    if (socket) {
+    console.log('[FILEUPLOAD] Sample file button clicked!')
+    console.log('[FILEUPLOAD] Socket available:', !!socket)
+    console.log('[FILEUPLOAD] Socket connected:', socket?.connected)
+    console.log('[FILEUPLOAD] Socket ID:', socket?.id)
+    
+    if (socket && socket.connected) {
       const filePath = '/Users/ajaymerchia/wkspc/logui/sample.log'
+      console.log('[FILEUPLOAD] Requesting tail:start from server for:', filePath)
       socket.emit('tail:start', filePath)
+      
+      // Add confirmation listener
+      socket.once('source:added', (source) => {
+        console.log('[FILEUPLOAD] Successfully started tailing sample file:', source)
+      })
+      
+      // Add error listener
+      socket.once('error', (error) => {
+        console.error('[FILEUPLOAD] Error starting sample file tail:', error)
+      })
+    } else {
+      console.error('[FILEUPLOAD] Socket not connected for sample file!', { 
+        available: !!socket, 
+        connected: socket?.connected,
+        id: socket?.id
+      })
     }
   }
 

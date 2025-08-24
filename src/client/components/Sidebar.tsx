@@ -5,10 +5,10 @@ import { ChevronLeft, File, AlertTriangle, Clock, AlertCircle } from 'lucide-rea
 const Sidebar: React.FC = () => {
   const { sources, filters, filteredLogs, logs, updateFilter, toggleSource, isSidebarCollapsed, toggleSidebar, isMobileSidebarOpen, toggleMobileSidebar } = useLogStore()
 
-  console.log('[Sidebar] Rendering with:', {
-    sources,
-    filters,
-  });
+  // console.log('[Sidebar] Rendering with:', {
+  //   sources,
+  //   filters,
+  // });
 
   // Calculate filtered count per source
   const getFilteredCountForSource = (sourceId: string) => {

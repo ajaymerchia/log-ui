@@ -12,13 +12,13 @@ const StatusBar: React.FC = () => {
     setAutoScroll 
   } = useLogStore()
 
-  console.log('[StatusBar] Rendering with:', {
-    isConnected,
-    filteredLogsCount: filteredLogs.length,
-    totalLogsCount: logs.length,
-    filters,
-    autoScroll,
-  });
+  // console.log('[StatusBar] Rendering with:', {
+  //   isConnected,
+  //   filteredLogsCount: filteredLogs.length,
+  //   totalLogsCount: logs.length,
+  //   filters,
+  //   autoScroll,
+  // });
 
   const activeFiltersCount = filters.levels.length + filters.tags.length + (filters.timeRange ? 1 : 0)
 

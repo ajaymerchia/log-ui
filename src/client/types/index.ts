@@ -1,6 +1,6 @@
 export interface LogEntry {
   id: string
-  timestamp: Date
+  timestamp: Date | string // Allow string for JSON serialization, will be validated/converted in component
   level: LogLevel
   message: string
   tags: string[]

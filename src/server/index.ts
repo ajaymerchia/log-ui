@@ -63,9 +63,13 @@ const REQUESTED_PORT = parseInt(process.env.PORT || '3001', 10)
 const AUTO_TAIL_FILE = process.env.LOGUI_FILE
 const logTailers = new Map<string, LogTailer>()
 const logParser = new LogParser()
+// Track which sockets are listening to which files
+const socketFileMap = new Map<string, Set<string>>() // socketId -> Set<filePath>
+const fileSocketMap = new Map<string, Set<string>>() // filePath -> Set<socketId>
 
 console.log(`[SERVER] Initializing LogUI server...`)
 console.log(`[SERVER] LogTailers map initialized with ${logTailers.size} entries`)
+console.log(`[SERVER] Socket tracking maps initialized`)
 console.log(`[SERVER] LogParser initialized`)
 if (AUTO_TAIL_FILE) {
   console.log(`[SERVER] Auto-tail file specified: ${AUTO_TAIL_FILE}`)
@@ -189,6 +193,54 @@ process.stdin.on('end', () => {
   }
 })
 
+// Helper function to add socket to file tracking
+const addSocketToFile = (socketId: string, filePath: string) => {
+  if (!socketFileMap.has(socketId)) {
+    socketFileMap.set(socketId, new Set())
+  }
+  socketFileMap.get(socketId)!.add(filePath)
+  
+  if (!fileSocketMap.has(filePath)) {
+    fileSocketMap.set(filePath, new Set())
+  }
+  fileSocketMap.get(filePath)!.add(socketId)
+  
+  console.log(`[SOCKET] Added socket ${socketId} to file ${filePath}. Listeners: ${fileSocketMap.get(filePath)!.size}`)
+}
+
+// Helper function to remove socket from file tracking
+const removeSocketFromFile = (socketId: string, filePath: string) => {
+  if (socketFileMap.has(socketId)) {
+    socketFileMap.get(socketId)!.delete(filePath)
+    if (socketFileMap.get(socketId)!.size === 0) {
+      socketFileMap.delete(socketId)
+    }
+  }
+  
+  if (fileSocketMap.has(filePath)) {
+    fileSocketMap.get(filePath)!.delete(socketId)
+    const remainingListeners = fileSocketMap.get(filePath)!.size
+    console.log(`[SOCKET] Removed socket ${socketId} from file ${filePath}. Remaining listeners: ${remainingListeners}`)
+    
+    if (remainingListeners === 0) {
+      console.log(`[SOCKET] No more listeners for ${filePath}, stopping tailer`)
+      fileSocketMap.delete(filePath)
+      
+      if (filePath === 'stdin') {
+        console.log(`[SOCKET] No more listeners for stdin, marking stdin as inactive`)
+        // For stdin, we can't really stop it, but we can mark it as inactive
+      } else {
+        const tailer = logTailers.get(filePath)
+        if (tailer) {
+          tailer.stop()
+          logTailers.delete(filePath)
+          console.log(`[SOCKET] Stopped and removed tailer for ${filePath}`)
+        }
+      }
+    }
+  }
+}
+
 // Socket.IO connection handling
 io.on('connection', (socket) => {
   console.log(`[SOCKET] Client connected: ${socket.id}`)
@@ -205,6 +257,7 @@ io.on('connection', (socket) => {
   // If we detected stdin data, automatically add stdin as a source
   if (hasStdinData) {
     console.log(`[SOCKET] Adding stdin source for client ${socket.id}`)
+    addSocketToFile(socket.id, 'stdin')
     const sourceInfo = {
       id: 'stdin',
       name: 'stdin',
@@ -247,8 +300,11 @@ io.on('connection', (socket) => {
     console.log(`[SOCKET] Starting to tail: ${filePath}`)
     console.log(`[SOCKET] Current logTailers: ${Array.from(logTailers.keys()).join(', ')}`)
     
+    // Add this socket as a listener for this file
+    addSocketToFile(targetSocket.id, filePath)
+    
     if (logTailers.has(filePath)) {
-      console.log(`[SOCKET] Already tailing ${filePath}, skipping...`)
+      console.log(`[SOCKET] Already tailing ${filePath}, just adding socket as listener`)
       return
     }
 
@@ -303,17 +359,23 @@ io.on('connection', (socket) => {
     tailer.once('end', () => {
       console.log(`[TAILER] Initial read ended for ${filePath}, sending batch of ${initialLines.length} lines`)
       
-      // Process initial lines with append logic
-      const processedEntries: Array<{entry?: LogEntry, content: string, isAppend: boolean}> = []
+      // Process initial lines with append logic - create consolidated LogEntry objects
+      const processedEntries: LogEntry[] = []
       
       for (const lineData of initialLines) {
         if (!lineData.isAppend) {
+          // New log entry
           const logEntry = logParser.parseLine(lineData.content, filePath)
           if (logEntry) {
-            processedEntries.push({entry: logEntry, content: lineData.content, isAppend: false})
+            processedEntries.push(logEntry)
           }
         } else {
-          processedEntries.push({content: lineData.content, isAppend: true})
+          // Append to last entry if exists
+          if (processedEntries.length > 0) {
+            const lastEntry = processedEntries[processedEntries.length - 1]
+            lastEntry.message = lastEntry.message + '\n' + lineData.content
+          }
+          // If no entries to append to, skip this line
         }
       }
       
@@ -346,8 +408,20 @@ io.on('connection', (socket) => {
 
   socket.on('tail:start', async (filePath: string) => {
     console.log(`[SOCKET] Client ${socket.id} requested to tail: ${filePath}`)
+    const isampleFile = filePath.includes('sample.log')
+    const isDemoFile = filePath.includes('demo.log')
+    
+    if (isampleFile) {
+      console.log(`[SOCKET] Processing SAMPLE LOG file request for: ${filePath}`)
+    } else if (isDemoFile) {
+      console.log(`[SOCKET] Processing DEMO LOG file request for: ${filePath}`)
+    } else {
+      console.log(`[SOCKET] Processing regular file tail request for: ${filePath}`)
+    }
+    
     try {
       await startTailing(socket, filePath)
+      console.log(`[SOCKET] Successfully completed tail:start request for ${filePath}`)
     } catch (error) {
       console.error(`[SOCKET] Error starting tail for ${filePath}:`, error)
       socket.emit('error', { message: 'Failed to start tailing file' })
@@ -357,9 +431,12 @@ io.on('connection', (socket) => {
   socket.on('file:upload', (fileData: { name: string, size: number, lines: string[] }) => {
     console.log(`[SOCKET] Client ${socket.id} uploaded file: ${fileData.name} (${fileData.size} bytes, ${fileData.lines.length} lines)`)
     
+    const fileId = `upload:${fileData.name}`
+    addSocketToFile(socket.id, fileId)
+    
     // Send source added event
     const sourceInfo = {
-      id: `upload:${fileData.name}`,
+      id: fileId,
       name: fileData.name,
       path: fileData.name,
       isActive: true,
@@ -370,11 +447,10 @@ io.on('connection', (socket) => {
     console.log(`[SOCKET] Emitting source:added for uploaded file:`, sourceInfo)
     socket.emit('source:added', sourceInfo)
 
-    // Process all lines and send as a batch
+    // Process all lines and send as direct LogEntry array (same as file tailing)
     const processedEntries = fileData.lines.map(line => {
-      const logEntry = logParser.parseLine(line, fileData.name)
-      return logEntry ? { entry: logEntry, content: line, isAppend: false } : null
-    }).filter(entry => entry !== null)
+      return logParser.parseLine(line, fileData.name)
+    }).filter(entry => entry !== null) as LogEntry[]
 
     console.log(`[SOCKET] Processed ${processedEntries.length} log entries from uploaded file`)
     
@@ -386,21 +462,26 @@ io.on('connection', (socket) => {
 
   socket.on('tail:stop', (filePath: string) => {
     console.log(`[SOCKET] Client ${socket.id} requested to stop tailing: ${filePath}`)
-    const tailer = logTailers.get(filePath)
-    if (tailer) {
-      console.log(`[SOCKET] Stopping tailer for ${filePath}`)
-      tailer.stop()
-      logTailers.delete(filePath)
-      socket.emit('source:removed', filePath)
-      console.log(`[SOCKET] Stopped tailing ${filePath}, total tailers: ${logTailers.size}`)
-    } else {
-      console.log(`[SOCKET] No tailer found for ${filePath}`)
-    }
+    removeSocketFromFile(socket.id, filePath)
+    socket.emit('source:removed', filePath)
+    console.log(`[SOCKET] Removed socket from file tracking for ${filePath}, total tailers: ${logTailers.size}`)
   })
 
   socket.on('disconnect', () => {
     console.log(`[SOCKET] Client disconnected: ${socket.id}`)
     console.log(`[SOCKET] Total connected clients: ${io.sockets.sockets.size}`)
+    
+    // Clean up all files this socket was listening to
+    const listeningFiles = socketFileMap.get(socket.id)
+    if (listeningFiles) {
+      console.log(`[SOCKET] Cleaning up ${listeningFiles.size} files for disconnected socket ${socket.id}`)
+      // Make a copy of the set to avoid modification during iteration
+      const filesToCleanup = Array.from(listeningFiles)
+      for (const filePath of filesToCleanup) {
+        removeSocketFromFile(socket.id, filePath)
+      }
+    }
+    
     clearInterval(pingInterval)
   })
 })
