@@ -71,6 +71,8 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
     setConnected, 
     addSource, 
     removeSource, 
+    clearLogsFromSource,
+    addToast,
   } = useLogStore()
 
   // Memoize the event handlers to prevent recreation
@@ -122,6 +124,16 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
     socket.emit('pong')
   }, [socket])
 
+  const handleFileCleared = useCallback((data: { filePath: string, success: boolean, error?: string }) => {
+    console.log('[SOCKET_CONTEXT] File cleared response:', data)
+    if (data.success) {
+      clearLogsFromSource(data.filePath)
+      addToast(`File cleared successfully: ${data.filePath}`, 'success', 3000)
+    } else {
+      addToast(`Failed to clear file: ${data.error || 'Unknown error'}`, 'error', 5000)
+    }
+  }, [clearLogsFromSource, addToast])
+
   useEffect(() => {
     console.log('[SOCKET_CONTEXT] Setting up socket event listeners...')
 
@@ -157,6 +169,9 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
     // Keep-alive ping/pong
     socket.on('ping', handlePing)
 
+    // File operations
+    socket.on('file:cleared', handleFileCleared)
+
     // Cleanup function
     return () => {
       console.log('[SOCKET_CONTEXT] Cleaning up socket event listeners')
@@ -170,8 +185,9 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
       socket.off('source:removed', handleSourceRemoved)
       socket.off('connection:status', handleConnectionStatus)
       socket.off('ping', handlePing)
+      socket.off('file:cleared', handleFileCleared)
     }
-  }, [socket, handleLogEntry, handleLogBatch, handleLogAppend, handleSourceAdded, handleSourceRemoved, handleConnectionStatus, handlePing])
+  }, [socket, handleLogEntry, handleLogBatch, handleLogAppend, handleSourceAdded, handleSourceRemoved, handleConnectionStatus, handlePing, handleFileCleared])
   
   // Don't disconnect the singleton socket on component unmount
   // It should persist across React re-mounts

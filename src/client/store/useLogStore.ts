@@ -28,6 +28,7 @@ interface LogStore {
   addLogs: (logs: LogEntry[]) => void
   appendToLastLog: (content: string) => void
   clearLogs: () => void
+  clearLogsFromSource: (sourceId: string) => void
   setConnected: (connected: boolean) => void
   setAutoScroll: (autoScroll: boolean) => void
   setSelectedEntry: (entry: LogEntry | null) => void
@@ -124,6 +125,18 @@ export const useLogStore = create<LogStore>()(
           console.log(`[STORE] Before addLogs: ${state.logs.length} logs`);
           const newLogs = [...state.logs, ...logs].slice(-10000);
           console.log(`[STORE] After addLogs: ${newLogs.length} logs`);
+          
+          // Show performance warning if too many logs to render efficiently
+          if (newLogs.length > 5000 && state.toasts.length === 0) {
+            setTimeout(() => {
+              get().addToast(
+                `Processing ${newLogs.length.toLocaleString()} log entries. Performance may be impacted.`,
+                'info',
+                5000
+              );
+            }, 100);
+          }
+          
           return {
             logs: newLogs,
             filteredLogs: filterLogs(newLogs, state.filters),
@@ -150,6 +163,15 @@ export const useLogStore = create<LogStore>()(
         }),
 
       clearLogs: () => set({ logs: [], filteredLogs: [] }),
+
+      clearLogsFromSource: (sourceId) =>
+        set((state) => {
+          const newLogs = state.logs.filter(log => log.source !== sourceId);
+          return {
+            logs: newLogs,
+            filteredLogs: filterLogs(newLogs, state.filters),
+          };
+        }),
 
       setConnected: (connected) => set({ isConnected: connected }),
 

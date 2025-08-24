@@ -6,6 +6,9 @@ import hljs from 'highlight.js/lib/core'
 import json from 'highlight.js/lib/languages/json'
 import 'highlight.js/styles/github-dark.css'
 
+// Constants
+const MAX_TAG_CHAR_LEN = 20
+
 // Register the json language
 hljs.registerLanguage('json', json)
 
@@ -225,6 +228,34 @@ const LogEntry: React.FC<Props> = ({ log }) => {
     })
   }
 
+  const trimTag = (tag: string): string => {
+    if (tag.length <= MAX_TAG_CHAR_LEN) return tag
+    return '...' + tag.slice(-MAX_TAG_CHAR_LEN)
+  }
+
+  const hideStackTrace = (message: string): string => {
+    // Check if message contains stack trace patterns
+    const stackTracePatterns = [
+      /Stack trace:/i,
+      /\s+at\s+[^\n]+\([^)]+\)/,
+      /\s+at\s+[^\n]+:[0-9]+:[0-9]+/
+    ]
+    
+    const hasStackTrace = stackTracePatterns.some(pattern => pattern.test(message))
+    if (!hasStackTrace) return message
+    
+    // Find the start of the stack trace and truncate there
+    const lines = message.split('\n')
+    const stackTraceStart = lines.findIndex(line => 
+      /Stack trace:/i.test(line) || /^\s+at\s+/.test(line)
+    )
+    
+    if (stackTraceStart === -1) return message
+    
+    // Return everything before the stack trace
+    return lines.slice(0, stackTraceStart).join('\n').trim()
+  }
+
   const copyToClipboard = async (text: string) => {
     try {
       await navigator.clipboard.writeText(text)
@@ -311,7 +342,7 @@ const LogEntry: React.FC<Props> = ({ log }) => {
                   }`}
                 title={`Click to ${isTagActive ? 'remove' : 'add'} tag filter`}
               >
-                [{tag}]
+                [{trimTag(tag)}]
               </button>
             )
           })}
@@ -320,7 +351,7 @@ const LogEntry: React.FC<Props> = ({ log }) => {
         {/* Message - always truncated in first row */}
         <div className="flex-1 min-w-0">
           <div className="text-[11px] font-mono truncate">
-            {validatedLog.message.replace(/\s*\/[^\s]*\/demo\.log\s*$/, '')}
+            {hideStackTrace(validatedLog.message.replace(/\s*\/[^\s]*\/demo\.log\s*$/, ''))}
           </div>
         </div>
 
@@ -359,20 +390,30 @@ const LogEntry: React.FC<Props> = ({ log }) => {
       {/* Second row: expanded content spanning full width */}
       {isExpanded && (
         <div className="mt-2">
-          {/* Full message content spanning full width */}
-          <div className="text-[11px] font-mono whitespace-pre-wrap break-words bg-black/10 p-2 rounded border border-white/10">
-            {validatedLog.message.replace(/\s*\/[^\s]*\/demo\.log\s*$/, '')}
+          {/* Full message content spanning full width with scrolling and filler */}
+          <div className="text-[11px] font-mono bg-black/10 rounded border border-white/10 max-h-96 overflow-y-auto">
+            <div 
+              className="whitespace-pre-wrap break-words p-2"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {validatedLog.message.replace(/\s*\/[^\s]*\/demo\.log\s*$/, '')}
+            </div>
           </div>
           
           {/* Metadata below message if present */}
           {validatedLog.metadata && (
-            <div className="mt-2 text-[10px] text-text-secondary bg-black/5 p-2 rounded border border-white/5">
-              <div className="font-medium text-text-primary mb-1">Metadata:</div>
-              {Object.entries(validatedLog.metadata).map(([key, value]) => (
-                <div key={key}>
-                  <span className="font-medium">{key}:</span> {String(value)}
-                </div>
-              ))}
+            <div className="mt-2 text-[10px] text-text-secondary bg-black/5 rounded border border-white/5 max-h-48 overflow-y-auto">
+              <div 
+                className="p-2"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="font-medium text-text-primary mb-1">Metadata:</div>
+                {Object.entries(validatedLog.metadata).map(([key, value]) => (
+                  <div key={key}>
+                    <span className="font-medium">{key}:</span> {String(value)}
+                  </div>
+                ))}
+              </div>
             </div>
           )}
         </div>

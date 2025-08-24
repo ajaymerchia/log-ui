@@ -1,28 +1,65 @@
 import React, { useEffect } from 'react'
 import { useLogStore } from '../store/useLogStore'
-import { Moon, Sun, Command, Menu } from 'lucide-react'
+import { useSocketContext } from '../contexts/SocketContext'
+import { Moon, Sun, Command, Menu, Trash2 } from 'lucide-react'
 import { Tooltip } from '@mui/material'
 
 const Header: React.FC = () => {
   const { 
     isConnected, 
     toggleMobileSidebar,
+    sources,
+    addToast,
     // isDarkMode,
     // toggleDarkMode
   } = useLogStore()
+  const { socket } = useSocketContext()
 
-  // // Keyboard shortcut: Command + Shift + 8
-  // useEffect(() => {
-  //   const handleKeyDown = (e: KeyboardEvent) => {
-  //     if (e.metaKey && e.shiftKey && e.key === '8') {
-  //       e.preventDefault()
-  //       toggleDarkMode()
-  //     }
-  //   }
+  // Function to clear currently tailed file
+  const clearCurrentFile = () => {
+    const tailedFiles = sources.filter(source => 
+      source.isActive && !source.id.startsWith('upload:') && source.id !== 'stdin'
+    )
+    
+    if (tailedFiles.length === 0) {
+      addToast('No tailed files to clear', 'info', 3000)
+      return
+    }
+    
+    if (tailedFiles.length === 1) {
+      const file = tailedFiles[0]
+      if (confirm(`Clear contents of ${file.name}?`)) {
+        socket?.emit('file:clear', file.id)
+      }
+    } else {
+      // Multiple files - show selection dialog
+      const fileNames = tailedFiles.map(f => f.name).join(', ')
+      const fileId = prompt(`Multiple files are being tailed: ${fileNames}\n\nEnter the file path to clear:`)
+      if (fileId) {
+        const matchingFile = tailedFiles.find(f => f.id === fileId || f.name === fileId)
+        if (matchingFile) {
+          if (confirm(`Clear contents of ${matchingFile.name}?`)) {
+            socket?.emit('file:clear', matchingFile.id)
+          }
+        } else {
+          addToast('File not found in tailed files', 'error', 3000)
+        }
+      }
+    }
+  }
 
-  //   document.addEventListener('keydown', handleKeyDown)
-  //   return () => document.removeEventListener('keydown', handleKeyDown)
-  // }, [toggleDarkMode])
+  // Keyboard shortcut: Command + K
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+        e.preventDefault()
+        clearCurrentFile()
+      }
+    }
+
+    document.addEventListener('keydown', handleKeyDown)
+    return () => document.removeEventListener('keydown', handleKeyDown)
+  }, [socket, sources, addToast])
 
   return (
     <header className="h-14 px-6 flex items-center justify-between border-b border-border bg-white/95 dark:bg-surface-dark/95 backdrop-blur">
@@ -55,6 +92,18 @@ const Header: React.FC = () => {
       </div>
 
       <div className="flex items-center gap-3">
+        {/* Clear file button */}
+        <Tooltip title="⌘K Clear tailed log file" placement="top" arrow>
+          <button 
+            onClick={clearCurrentFile}
+            disabled={!isConnected || sources.filter(s => s.isActive && !s.id.startsWith('upload:') && s.id !== 'stdin').length === 0}
+            className="flex items-center gap-2 px-3 py-1.5 text-sm text-text-secondary hover:text-text-primary transition-colors rounded-md hover:bg-black/5 dark:hover:bg-white/5 disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            <Trash2 className="w-4 h-4" />
+            <span className="hidden lg:inline">Clear File</span>
+          </button>
+        </Tooltip>
+
         {/* <Tooltip title="⌘⇧8" placement="top" arrow>
           <button 
             onClick={toggleDarkMode}

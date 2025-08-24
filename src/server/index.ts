@@ -21,7 +21,8 @@ const io = new Server(server, {
     },
     methods: ["GET", "POST"],
     credentials: true
-  }
+  },
+  maxHttpBufferSize: 10 * 1024 * 1024 // 10MB limit for file uploads
 })
 
 // Helper function to check if a port is available
@@ -476,8 +477,8 @@ io.on('connection', (socket) => {
     }
   })
 
-  socket.on('file:upload', (fileData: { name: string, size: number, lines: string[] }) => {
-    console.log(`[SOCKET] Client ${socket.id} uploaded file: ${fileData.name} (${fileData.size} bytes, ${fileData.lines.length} lines)`)
+  socket.on('file:upload', (fileData: { name: string, size: number, lines: string[], tailing?: boolean }) => {
+    console.log(`[SOCKET] Client ${socket.id} uploaded file: ${fileData.name} (${fileData.size} bytes, ${fileData.lines.length} lines, tailing: ${fileData.tailing || false})`)
     
     const fileId = `upload:${fileData.name}`
     addSocketToFile(socket.id, fileId)
@@ -488,7 +489,7 @@ io.on('connection', (socket) => {
       name: fileData.name,
       path: fileData.name,
       isActive: true,
-      color: '#5E6AD2',
+      color: fileData.tailing ? '#10B981' : '#5E6AD2', // Green for tailing, blue for static
       entryCount: fileData.lines.length,
       lastActivity: new Date()
     }
@@ -508,11 +509,64 @@ io.on('connection', (socket) => {
     }
   })
 
+  socket.on('file:append', (appendData: { name: string, lines: string[] }) => {
+    console.log(`[SOCKET] Client ${socket.id} appended to file: ${appendData.name} (${appendData.lines.length} new lines)`)
+    
+    const fileId = `upload:${appendData.name}`
+    
+    // Process new lines and send as batch
+    const processedEntries = appendData.lines.map(line => {
+      return logParser.parseLine(line, fileId)
+    }).filter(entry => entry !== null) as LogEntry[]
+
+    if (processedEntries.length > 0) {
+      console.log(`[SOCKET] Emitting log:batch of ${processedEntries.length} appended entries`)
+      socket.emit('log:batch', processedEntries)
+    }
+  })
+
   socket.on('tail:stop', (filePath: string) => {
     console.log(`[SOCKET] Client ${socket.id} requested to stop tailing: ${filePath}`)
     removeSocketFromFile(socket.id, filePath)
     socket.emit('source:removed', filePath)
     console.log(`[SOCKET] Removed socket from file tracking for ${filePath}, total tailers: ${logTailers.size}`)
+  })
+
+  socket.on('file:clear', async (filePath: string) => {
+    console.log(`[SOCKET] Client ${socket.id} requested to clear file: ${filePath}`)
+    
+    try {
+      // Security check: only allow clearing real files, not stdin or uploads
+      if (filePath === 'stdin' || filePath.startsWith('upload:')) {
+        socket.emit('error', { message: 'Cannot clear this type of source' })
+        return
+      }
+      
+      // Check if file exists and is writable
+      await fs.promises.access(filePath, fs.constants.F_OK | fs.constants.W_OK)
+      
+      // Clear the file by truncating it
+      await fs.promises.writeFile(filePath, '', 'utf8')
+      
+      console.log(`[SOCKET] Successfully cleared file: ${filePath}`)
+      socket.emit('file:cleared', { filePath, success: true })
+      
+      // Emit to all sockets listening to this file
+      const listeningSockets = fileSocketMap.get(filePath)
+      if (listeningSockets) {
+        for (const socketId of listeningSockets) {
+          const clientSocket = io.sockets.sockets.get(socketId)
+          if (clientSocket) {
+            clientSocket.emit('file:cleared', { filePath, success: true })
+          }
+        }
+      }
+      
+    } catch (error) {
+      console.error(`[SOCKET] Error clearing file ${filePath}:`, error)
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+      socket.emit('file:cleared', { filePath, success: false, error: errorMessage })
+    }
   })
 
   socket.on('disconnect', () => {

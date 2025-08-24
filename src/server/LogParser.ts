@@ -51,11 +51,18 @@ export class LogParser {
         console.log(`[PARSER] No tags extracted`)
       }
 
-      // Try to parse as JSON
-      const jsonData = this.tryParseJson(line)
-      if (jsonData) {
-        console.log(`[PARSER] JSON pattern detected, using JSON parser`)
-        return this.parseJsonLog(jsonData, source)
+      // Try to parse as JSON - but only if we haven't already extracted structured data
+      const hasStructuredData = timestampMatch || levelMatch || tagMatch
+      console.log(`[PARSER] Structured data check - timestamp: ${!!timestampMatch}, level: ${!!levelMatch}, tags: ${!!tagMatch}, hasStructured: ${hasStructuredData}`)
+      
+      if (!hasStructuredData) {
+        const jsonData = this.tryParseJson(line)
+        if (jsonData) {
+          console.log(`[PARSER] JSON pattern detected, using JSON parser`)
+          return this.parseJsonLog(jsonData, source)
+        }
+      } else {
+        console.log(`[PARSER] Skipping JSON parsing because structured data was found`)
       }
 
       console.log(`[PARSER] Successfully parsed line from ${source}: ${entry.level} - ${entry.message.substring(0, 50)}...`)
@@ -228,6 +235,19 @@ export class LogParser {
     if (!line.trim()) return false
     
     console.log(`[PARSER] Checking if line is new entry: "${line.substring(0, 80)}..."`)
+    
+    // Check for stack trace patterns - these are always continuations
+    const stackTracePatterns = [
+      /^Stack trace:\s*$/i,
+      /^\s+at\s+/,  // Lines starting with "  at " (stack trace frames)
+    ]
+    
+    for (const pattern of stackTracePatterns) {
+      if (pattern.test(line)) {
+        console.log(`[PARSER] Line matches stack trace pattern: false (continuation)`)
+        return false
+      }
+    }
     
     // Check for timestamp patterns at the beginning of the line
     const timestampPatterns = [

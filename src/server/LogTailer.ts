@@ -34,7 +34,7 @@ export class LogTailer extends EventEmitter {
       
       // Get initial file size
       const stats = await fs.promises.stat(this.filePath)
-      this.position = Math.max(0, stats.size - 1024 * 1024) // Start from last 1MB
+      this.position = Math.max(0, stats.size - 10 * 1024 * 1024) // Start from last 10MB
       console.log(`[LOGTAILER] File size: ${stats.size} bytes, starting position: ${this.position}`)
       
       // Read initial content
