@@ -10,9 +10,21 @@ interface SampleFile {
 
 const FileUpload: React.FC = () => {
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const dropdownRef = useRef<HTMLDivElement>(null)
   const { socket } = useSocketContext()
   const [showSampleFiles, setShowSampleFiles] = useState(false)
   const [availableFiles, setAvailableFiles] = useState<SampleFile[]>([])
+  
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setShowSampleFiles(false)
+      }
+    }
+
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
   
   useEffect(() => {
     // Fetch available sample files from the API
@@ -126,7 +138,7 @@ const FileUpload: React.FC = () => {
               Select File
             </button>
             
-            <div className="relative">
+            <div className="relative" ref={dropdownRef}>
               <button
                 onClick={() => setShowSampleFiles(!showSampleFiles)}
                 className="w-full px-4 py-2 bg-black/5 dark:bg-white/5 border border-border text-text-primary rounded-lg hover:bg-black/10 dark:hover:bg-white/10 transition-colors flex items-center justify-between"
@@ -139,7 +151,7 @@ const FileUpload: React.FC = () => {
               </button>
               
               {showSampleFiles && (
-                <div className="absolute top-full left-0 right-0 mt-1 bg-background border border-border rounded-lg shadow-lg z-50 max-h-80 overflow-y-auto">
+                <div className="absolute bottom-full left-0 right-0 mb-1 bg-gray-900 dark:bg-gray-900 border border-border rounded-lg shadow-xl z-[999] max-h-80 overflow-y-auto">
                   {availableFiles.map((file, index) => (
                     <button
                       key={index}

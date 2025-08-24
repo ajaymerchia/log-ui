@@ -2,8 +2,31 @@
 
 const fs = require('fs')
 const path = require('path')
+const { Command } = require('commander')
 
-const LOG_FILE = path.join(__dirname, 'samples', 'livestream.log')
+const program = new Command()
+
+program
+  .name('generate-logs')
+  .description('Generate realistic log entries for testing LogUI')
+  .version('1.0.0')
+  .option('-t, --target-file <path>', 'target file to write logs to', 'samples/livestream.log')
+  .option('--no-clear', 'do not clear the target file before writing (append mode)')
+  .option('-i, --interval <ms>', 'interval range for log generation (e.g., "500-2000")', '500-2000')
+  .option('-b, --batch-size <size>', 'batch size range (e.g., "1-3")', '1-3')
+  .parse()
+
+const options = program.opts()
+
+// Resolve target file path
+let LOG_FILE
+if (path.isAbsolute(options.targetFile)) {
+  LOG_FILE = options.targetFile
+} else if (options.targetFile.includes('/')) {
+  LOG_FILE = path.resolve(options.targetFile)
+} else {
+  LOG_FILE = path.join(__dirname, 'samples', options.targetFile)
+}
 const SERVICES = ['API', 'AUTH', 'DB', 'CACHE', 'PAYMENT', 'METRICS', 'SECURITY', 'SERVER']
 const LOG_LEVELS = ['INFO', 'WARN', 'ERROR', 'DEBUG']
 const IPS = ['192.168.1.100', '192.168.1.101', '10.0.0.15', '172.16.0.5']
@@ -113,16 +136,32 @@ function generateLogEntry() {
 }
 
 function startLogging() {
+  // Parse interval and batch size ranges
+  const [minInterval, maxInterval] = options.interval.split('-').map(Number)
+  const [minBatch, maxBatch] = options.batchSize.split('-').map(Number)
+  
   console.log(`🚀 Starting log generator...`)
   console.log(`📄 Writing logs to: ${LOG_FILE}`)
-  console.log(`⏱️  Generating 1-3 logs every 500-2000ms`)
+  console.log(`⏱️  Generating ${minBatch}-${maxBatch} logs every ${minInterval}-${maxInterval}ms`)
+  console.log(`📝 Mode: ${options.clear ? 'overwrite' : 'append'}`)
   console.log(`🛑 Press Ctrl+C to stop\n`)
 
-  // Clear the log file
-  fs.writeFileSync(LOG_FILE, '')
+  // Ensure the directory exists
+  const logDir = path.dirname(LOG_FILE)
+  if (!fs.existsSync(logDir)) {
+    fs.mkdirSync(logDir, { recursive: true })
+  }
+
+  // Clear the log file only if --no-clear wasn't specified
+  if (options.clear) {
+    fs.writeFileSync(LOG_FILE, '')
+    console.log(`🗑️  Cleared existing log file\n`)
+  } else {
+    console.log(`➕ Appending to existing log file\n`)
+  }
 
   const generateBatch = () => {
-    const batchSize = randomInt(1, 3)
+    const batchSize = randomInt(minBatch, maxBatch)
     const entries = []
     
     for (let i = 0; i < batchSize; i++) {
@@ -148,7 +187,7 @@ function startLogging() {
     })
     
     // Schedule next batch
-    const delay = randomInt(500, 2000)
+    const delay = randomInt(minInterval, maxInterval)
     setTimeout(generateBatch, delay)
   }
 

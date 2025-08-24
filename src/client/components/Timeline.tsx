@@ -1,12 +1,15 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react'
 import { useLogStore } from '../store/useLogStore'
-import { Minus, Plus, RotateCcw } from 'lucide-react'
+import { Minus, Plus, RotateCcw, Clock } from 'lucide-react'
 
 const Timeline: React.FC = () => {
   const { filteredLogs, updateFilter, filters } = useLogStore()
   const [timelineWidth, setTimelineWidth] = useState(0)
   const [isDragging, setIsDragging] = useState<'start' | 'end' | null>(null)
   const [dragStartX, setDragStartX] = useState(0)
+  const [showManualInput, setShowManualInput] = useState(false)
+  const [startTimeInput, setStartTimeInput] = useState('')
+  const [endTimeInput, setEndTimeInput] = useState('')
   const timelineRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -30,11 +33,13 @@ const Timeline: React.FC = () => {
 
   const handleMouseUp = useCallback(() => {
     setIsDragging(null)
+    setDragStartX(0)
   }, [])
 
   useEffect(() => {
     if (isDragging) {
       const handleMouseMove = (e: MouseEvent) => {
+        e.preventDefault()
         if (!timelineRef.current) return
 
         const rect = timelineRef.current.getBoundingClientRect()
@@ -75,14 +80,67 @@ const Timeline: React.FC = () => {
         }
       }
 
-      document.addEventListener('mousemove', handleMouseMove)
-      document.addEventListener('mouseup', handleMouseUp)
+      const handleMouseUpGlobal = (e: MouseEvent) => {
+        e.preventDefault()
+        handleMouseUp()
+      }
+
+      document.addEventListener('mousemove', handleMouseMove, { passive: false })
+      document.addEventListener('mouseup', handleMouseUpGlobal, { passive: false })
+      
       return () => {
         document.removeEventListener('mousemove', handleMouseMove)
-        document.removeEventListener('mouseup', handleMouseUp)
+        document.removeEventListener('mouseup', handleMouseUpGlobal)
       }
     }
   }, [isDragging, filteredLogs, filters.timeRange, updateFilter, handleMouseUp])
+
+  const formatInputTime = (date: Date) => {
+    return date.toISOString().slice(0, 19)
+  }
+
+  const parseInputTime = (timeString: string): Date | null => {
+    try {
+      const date = new Date(timeString)
+      return isNaN(date.getTime()) ? null : date
+    } catch {
+      return null
+    }
+  }
+
+  const toggleManualInput = () => {
+    if (!showManualInput && filteredLogs.length > 0) {
+      const allStartTime = new Date(Math.min(...filteredLogs.map(log => new Date(log.timestamp).getTime())))
+      const allEndTime = new Date(Math.max(...filteredLogs.map(log => new Date(log.timestamp).getTime())))
+      const currentStart = filters.timeRange?.start || allStartTime
+      const currentEnd = filters.timeRange?.end || allEndTime
+      
+      setStartTimeInput(formatInputTime(currentStart))
+      setEndTimeInput(formatInputTime(currentEnd))
+    }
+    setShowManualInput(!showManualInput)
+  }
+
+  const applyManualTimeRange = () => {
+    const startDate = parseInputTime(startTimeInput)
+    const endDate = parseInputTime(endTimeInput)
+    
+    if (startDate && endDate && startDate.getTime() < endDate.getTime()) {
+      updateFilter({ 
+        timeRange: { 
+          start: startDate, 
+          end: endDate 
+        } 
+      })
+      setShowManualInput(false)
+    }
+  }
+
+  const cancelManualInput = () => {
+    setShowManualInput(false)
+    setStartTimeInput('')
+    setEndTimeInput('')
+  }
 
   // Early return after all hooks are called
   if (filteredLogs.length === 0) {
@@ -145,10 +203,18 @@ const Timeline: React.FC = () => {
   const isFiltered = filters.timeRange !== null
 
   return (
-    <div className="space-y-3">
+    <div className={`space-y-3 ${isDragging ? 'cursor-ew-resize' : ''}`}>
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <span className="text-sm font-medium text-text-secondary">Timeline</span>
+          <button
+            onClick={toggleManualInput}
+            className="flex items-center gap-1 px-2 py-1 text-xs text-text-secondary hover:text-text-primary bg-black/5 dark:bg-white/5 hover:bg-black/10 dark:hover:bg-white/10 rounded transition-colors"
+            title="Manual time input"
+          >
+            <Clock className="w-3 h-3" />
+            Manual
+          </button>
           {isFiltered && (
             <button
               onClick={resetTimeRange}
@@ -166,6 +232,50 @@ const Timeline: React.FC = () => {
           <span>{formatTime(allEndTime)}</span>
         </div>
       </div>
+
+      {/* Manual time input form */}
+      {showManualInput && (
+        <div className="bg-black/5 dark:bg-white/5 border border-border rounded-lg p-3 space-y-3">
+          <div className="flex items-center gap-2 text-xs font-medium text-text-secondary">
+            <Clock className="w-3 h-3" />
+            Manual Time Range
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div className="space-y-1">
+              <label className="text-xs text-text-secondary">Start Time</label>
+              <input
+                type="datetime-local"
+                value={startTimeInput}
+                onChange={(e) => setStartTimeInput(e.target.value)}
+                className="w-full px-2 py-1 text-xs bg-white dark:bg-black border border-border rounded focus:outline-none focus:ring-1 focus:ring-primary"
+              />
+            </div>
+            <div className="space-y-1">
+              <label className="text-xs text-text-secondary">End Time</label>
+              <input
+                type="datetime-local"
+                value={endTimeInput}
+                onChange={(e) => setEndTimeInput(e.target.value)}
+                className="w-full px-2 py-1 text-xs bg-white dark:bg-black border border-border rounded focus:outline-none focus:ring-1 focus:ring-primary"
+              />
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={applyManualTimeRange}
+              className="px-3 py-1 text-xs bg-primary text-white rounded hover:bg-primary/90 transition-colors"
+            >
+              Apply
+            </button>
+            <button
+              onClick={cancelManualInput}
+              className="px-3 py-1 text-xs bg-black/10 dark:bg-white/10 text-text-secondary hover:text-text-primary rounded transition-colors"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
 
       <div className="space-y-2">
         {/* Selected time range display */}
@@ -215,16 +325,20 @@ const Timeline: React.FC = () => {
 
           {/* Start handle */}
           <div
-            className="absolute top-0 w-4 h-4 bg-primary border-2 border-white rounded-full cursor-ew-resize hover:scale-110 transition-transform shadow-md"
-            style={{ left: `calc(${startPosition}% - 8px)` }}
+            className={`absolute top-0 w-4 h-4 bg-primary border-2 border-white rounded-full cursor-ew-resize hover:scale-110 transition-transform shadow-md ${
+              isDragging === 'start' ? 'scale-110 shadow-lg' : ''
+            }`}
+            style={{ left: `calc(${startPosition}% - 8px)`, userSelect: 'none' }}
             onMouseDown={(e) => handleMouseDown(e, 'start')}
             title={`Start: ${formatDate(currentStart)}`}
           />
 
           {/* End handle */}
           <div
-            className="absolute top-0 w-4 h-4 bg-primary border-2 border-white rounded-full cursor-ew-resize hover:scale-110 transition-transform shadow-md"
-            style={{ left: `calc(${endPosition}% - 8px)` }}
+            className={`absolute top-0 w-4 h-4 bg-primary border-2 border-white rounded-full cursor-ew-resize hover:scale-110 transition-transform shadow-md ${
+              isDragging === 'end' ? 'scale-110 shadow-lg' : ''
+            }`}
+            style={{ left: `calc(${endPosition}% - 8px)`, userSelect: 'none' }}
             onMouseDown={(e) => handleMouseDown(e, 'end')}
             title={`End: ${formatDate(currentEnd)}`}
           />
